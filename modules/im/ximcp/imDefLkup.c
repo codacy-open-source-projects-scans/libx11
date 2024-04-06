@@ -341,54 +341,6 @@ _XimForwardEvent(
     return _XimForwardEventCore(ic, ev, sync);
 }
 
-Bool
-_XimFabricateSerial(
-    Xim			 im,
-    unsigned long	 serial)
-{
-    if (!serial)
-	return False;
-    if (serial == im->private.proto.fabricated_serial) {
-	fprintf(stderr, "%s,%d: The key event is already fabricated.\n", __FILE__, __LINE__);
-	return False;
-    }
-    if (im->private.proto.fabricated_serial)
-	fprintf(stderr, "%s,%d: Tried to fabricate a wrong key event.\n", __FILE__, __LINE__);
-
-    MARK_FABRICATED(im);
-    im->private.proto.fabricated_serial = serial;
-    return True;
-}
-
-Bool
-_XimUnfabricateSerial(
-    Xim			 im,
-    unsigned long	 serial)
-{
-    if (!serial)
-	return False;
-    if (!im->private.proto.fabricated_serial) {
-	fprintf(stderr, "%s,%d: The key event is already unfabricated.\n", __FILE__, __LINE__);
-	return False;
-    }
-    if (serial != im->private.proto.fabricated_serial)
-	fprintf(stderr, "%s,%d: Tried to unfabricate a wrong key event.\n", __FILE__, __LINE__);
-
-    im->private.proto.fabricated_serial = 0;
-    UNMARK_FABRICATED(im);
-    return True;
-}
-
-Bool
-_XimIsFabricatedSerial(
-    Xim			 im,
-    unsigned long	 serial)
-{
-    if (!serial)
-	return False;
-    return (serial == im->private.proto.fabricated_serial);
-}
-
 static void
 _XimProcEvent(
     Display		*d,
@@ -403,7 +355,7 @@ _XimProcEvent(
     ev->xany.serial |= serial << 16;
     ev->xany.send_event = False;
     ev->xany.display = d;
-    _XimFabricateSerial((Xim)ic->core.im, ev->xany.serial);
+    MARK_FABRICATED(ic->core.im);
     return;
 }
 
@@ -640,45 +592,20 @@ _XimRegCommitInfo(
 }
 
 static void
-_XimUnregRealCommitInfo(
-    Xic			ic,
-    Bool		reverse)
-{
-    XimCommitInfo	info;
-    XimCommitInfo	prev_info = NULL;
-
-    info = ic->private.proto.commit_info;
-    while (reverse && info) {
-	if (!info->next)
-	    break;
-	prev_info = info;
-	info = info->next;
-    }
-    if (!info)
-	return;
-
-    Xfree(info->string);
-    Xfree(info->keysym);
-    if (prev_info)
-	prev_info->next = info->next;
-    else
-	ic->private.proto.commit_info = info->next;
-    Xfree(info);
-    return;
-}
-
-static void
 _XimUnregCommitInfo(
     Xic			ic)
 {
-    _XimUnregRealCommitInfo(ic, False);
-}
+    XimCommitInfo	info;
 
-static void
-_XimUnregFirstCommitInfo(
-    Xic			ic)
-{
-    _XimUnregRealCommitInfo(ic, True);
+    if (!(info = ic->private.proto.commit_info))
+	return;
+
+
+    Xfree(info->string);
+    Xfree(info->keysym);
+    ic->private.proto.commit_info = info->next;
+    Xfree(info);
+    return;
 }
 
 void
@@ -688,19 +615,6 @@ _XimFreeCommitInfo(
     while (ic->private.proto.commit_info)
 	_XimUnregCommitInfo(ic);
     return;
-}
-
-static XimCommitInfo
-_XimFirstCommitInfo(
-    Xic			ic)
-{
-    XimCommitInfo info = ic->private.proto.commit_info;
-    while (info) {
-	if (!info->next)
-	    break;
-	info = info->next;
-    }
-    return info;
 }
 
 static Bool
@@ -790,6 +704,10 @@ _XimCommitRecv(
 
     (void)_XimRespSyncReply(ic, flag);
 
+    if (ic->private.proto.registed_filter_event
+	& (KEYPRESS_MASK | KEYRELEASE_MASK))
+	    MARK_FABRICATED(im);
+
     bzero(&ev, sizeof(ev));	/* uninitialized : found when running kterm under valgrind */
 
     ev.type = KeyPress;
@@ -801,10 +719,6 @@ _XimCommitRecv(
 
     ev.time = 0L;
     ev.serial = LastKnownRequestProcessed(im->core.display);
-
-    if (ic->private.proto.registed_filter_event
-	& (KEYPRESS_MASK | KEYRELEASE_MASK))
-	    _XimFabricateSerial(im, ev.serial);
     /* FIXME :
        I wish there were COMMENTs (!) about the data passed around.
     */
@@ -1097,7 +1011,7 @@ _XimProtoMbLookupString(
 	state = &tmp_state;
 
     if ((ev->type == KeyPress) && (ev->keycode == 0)) { /* Filter function */
-	if (!(info = _XimFirstCommitInfo(ic))) {
+	if (!(info = ic->private.proto.commit_info)) {
 	    *state = XLookupNone;
 	    return 0;
 	}
@@ -1113,7 +1027,7 @@ _XimProtoMbLookupString(
 	    else
 		*state = XLookupKeySym;
 	}
-	_XimUnregFirstCommitInfo(ic);
+	_XimUnregCommitInfo(ic);
 
     } else  if (ev->type == KeyPress) {
 	ret = _XimLookupMBText(ic, ev, buffer, bytes, keysym, NULL);
@@ -1160,7 +1074,7 @@ _XimProtoWcLookupString(
 	state = &tmp_state;
 
     if (ev->type == KeyPress && ev->keycode == 0) { /* Filter function */
-	if (!(info = _XimFirstCommitInfo(ic))) {
+	if (!(info = ic->private.proto.commit_info)) {
            *state = XLookupNone;
 	    return 0;
 	}
@@ -1176,7 +1090,7 @@ _XimProtoWcLookupString(
 	    else
 		*state = XLookupKeySym;
 	}
-	_XimUnregFirstCommitInfo(ic);
+	_XimUnregCommitInfo(ic);
 
     } else if (ev->type == KeyPress) {
 	ret = _XimLookupWCText(ic, ev, buffer, bytes, keysym, NULL);
@@ -1223,7 +1137,7 @@ _XimProtoUtf8LookupString(
 	state = &tmp_state;
 
     if (ev->type == KeyPress && ev->keycode == 0) { /* Filter function */
-	if (!(info = _XimFirstCommitInfo(ic))) {
+	if (!(info = ic->private.proto.commit_info)) {
            *state = XLookupNone;
 	    return 0;
 	}
@@ -1239,7 +1153,7 @@ _XimProtoUtf8LookupString(
 	    else
 		*state = XLookupKeySym;
 	}
-	_XimUnregFirstCommitInfo(ic);
+	_XimUnregCommitInfo(ic);
 
     } else if (ev->type == KeyPress) {
 	ret = _XimLookupUTF8Text(ic, ev, buffer, bytes, keysym, NULL);
