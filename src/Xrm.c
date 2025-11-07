@@ -1183,12 +1183,12 @@ static void GetDatabase(
 	if (c == '#') { /* Directive */
 	    /* remove extra whitespace */
 	    only_pcs = True;
-	    while (is_space(bits = next_char(c, str))) {};
+	    while (is_space(bits = next_char(c, str))) {}
 	    /* only "include" directive is currently defined */
 	    if (!strncmp(str, "include", 7)) {
 		str += (7-1);
 		/* remove extra whitespace */
-		while (is_space(bits = next_char(c, str))) {};
+		while (is_space(bits = next_char(c, str))) {}
 		/* must have a starting " */
 		if (c == '"') {
 		    _Xconst char *fname = str+1;
@@ -1577,18 +1577,18 @@ ReadInFile(_Xconst char *filename)
 
 
     /*
-     * MS-Windows and OS/2 note: Default open mode includes O_TEXT
+     * MS-Windows note: Default open mode includes O_TEXT
      */
     if ( (fd = _XOpenFile (filename, O_RDONLY)) == -1 )
 	return (char *)NULL;
 
     /*
-     * MS-Windows and OS/2 note: depending on how the sources are
+     * MS-Windows note: depending on how the sources are
      * untarred, the newlines in resource files may or may not have
      * been expanded to CRLF. Either way the size returned by fstat
      * is sufficient to read the file into because in text-mode any
      * CRLFs in a file will be converted to newlines (LF) with the
-     * result that the number of bytes actually read with be <=
+     * result that the number of bytes actually read will be <=
      * to the size returned by fstat.
      */
     {

@@ -72,10 +72,10 @@ core
 *.tar.bz2
 *.tar.gz
 #
-#		Add & Override patterns for libX11 
+#		Add & Override patterns for libX11
 #
 #		Edit the following section as needed
 # For example, !report.pc overrides *.pc. See 'man gitignore'
-# 
+#
 doltcompile
 doltlibtool

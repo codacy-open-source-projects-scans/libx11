@@ -20,6 +20,7 @@ include:
 
 stages:
   - prep             # prep work like rebuilding the container images if there is a change
+  - install-doctools
   - build            # for actually building and testing things in a container
   - test
   - deploy
@@ -30,8 +31,8 @@ variables:
   # The tag should be updated each time the list of packages is updated.
   # Changing a tag forces the associated image to be rebuilt.
   # Note: the tag has no meaning, we use a date format purely for readability
-  FDO_DISTRIBUTION_TAG:  '2023-02-06.1'
-  FDO_DISTRIBUTION_PACKAGES:  'git gcc pkgconf autoconf automake libtool make xorg-util-macros xtrans xorgproto libxcb'
+  FDO_DISTRIBUTION_TAG:  '2025-06-28.0'
+  FDO_DISTRIBUTION_PACKAGES:  'git gcc pkgconf autoconf automake libtool make xmlto libxslt docbook-xml docbook-xsl xorg-util-macros xtrans xorgproto libxcb'
 
 
 #
@@ -80,6 +81,28 @@ container-prep:
     GIT_STRATEGY: none
 
 
+# Install xorg-sgml-doctools from git, since Arch doesn't package it
+install-doctools:
+  extends:
+    - .fdo.distribution-image@arch
+  stage: install-doctools
+  script:
+    - export INSTDIR="$PWD/_inst"
+    - git clone --depth=1 https://gitlab.freedesktop.org/xorg/doc/xorg-sgml-doctools
+    - pushd xorg-sgml-doctools > /dev/null
+    - autoreconf -ivf
+    - mkdir _builddir
+    - pushd _builddir > /dev/null
+    - ../configure --disable-silent-rules --prefix="$INSTDIR"
+    - make
+    - make install
+    - popd > /dev/null
+    - popd > /dev/null
+  variables:
+  artifacts:
+    paths:
+      - _inst
+
 #
 # The default build, runs on the image built above.
 #
@@ -88,14 +111,19 @@ build:
   extends:
     - .fdo.distribution-image@arch
   script:
+    - export INSTDIR="$PWD/_inst"
+    - export PKG_CONFIG_PATH="$INSTDIR/share/pkgconfig"
     - autoreconf -ivf
     - mkdir _builddir
     - pushd _builddir > /dev/null
-    - ../configure --disable-silent-rules
+    - ../configure --disable-silent-rules --prefix="$INSTDIR" --enable-specs
     - make
     - make check
     - make distcheck
     - popd > /dev/null
+  artifacts:
+    paths:
+      - _inst
 
 #
 # Workflow rules needed due to:

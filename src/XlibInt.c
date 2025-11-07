@@ -1793,8 +1793,11 @@ void *_XGetRequest(Display *dpy, CARD8 type, size_t len)
     dpy->last_req = dpy->bufptr;
 
     req = (xReq*)dpy->bufptr;
-    req->reqType = type;
-    req->length = len / 4;
+    *req = (xReq) {
+        .reqType = type,
+        .data = 0,
+        .length = len / 4
+    };
     dpy->bufptr += len;
     X_DPY_REQUEST_INCREMENT(dpy);
     return req;
@@ -1877,7 +1880,6 @@ static int AccessFile (path, pathbuf, len_pathbuf, pathret)
     /* tried everywhere else, go fishing */
 #define C_DRIVE ('C' - 'A')
 #define Z_DRIVE ('Z' - 'A')
-    /* does OS/2 (with or with gcc-emx) have getdrives? */
     drives = _getdrives ();
     for (i = C_DRIVE; i <= Z_DRIVE; i++) { /* don't check on A: or B: */
 	if ((1 << i) & drives) {

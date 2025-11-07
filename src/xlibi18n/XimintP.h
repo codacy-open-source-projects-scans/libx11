@@ -311,20 +311,23 @@ typedef struct _XicProtoPrivateRec {
 #define XIM_MAXIMNAMELEN 64
 #define XIM_MAXLCNAMELEN 64
 
-Bool
+_X_HIDDEN Bool
 _XimFabricateSerial(
     Xim                  im,
     XKeyEvent           *event);
 
-Bool
+_X_HIDDEN Bool
 _XimUnfabricateSerial(
     Xim                  im,
     Xic                  ic,
     XKeyEvent           *event);
 
-Bool
+_X_HIDDEN Bool
 _XimIsFabricatedSerial(
     Xim                  im,
     XKeyEvent           *event);
 
+_X_HIDDEN void
+_XimPendingFilter(
+    Xic                  ic);
 #endif /* _XIMINTP_H */
